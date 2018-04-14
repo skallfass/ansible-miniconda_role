@@ -1,0 +1,25 @@
+- include_role:
+    name: uchida.miniconda
+
+- name: Ensure miniconda_group exists
+  group:
+      name: '{{ miniconda_group }}'
+      state: present
+
+- name: add user to miniconda_group
+  user:
+      name: '{{ item }}'
+      groups:
+          - '{{ miniconda_group }}'
+      append: yes
+  loop: '{{ miniconda_users }}'
+
+- name: modify conda-folder permissions
+  file:
+      path: '{{ miniconda_prefix }}'
+      owner: root
+      group: '{{ miniconda_group }}'
+      mode: 0775
+      state: directory
+      recurse: yes
+

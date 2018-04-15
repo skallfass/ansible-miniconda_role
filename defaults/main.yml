@@ -2,6 +2,7 @@ miniconda_group: condausers
 miniconda_prefix: /var/local/conda
 miniconda_python: 3
 miniconda_version: "latest"
+miniconda_installer_checksum: ""
 miniconda_update_conda: True
 miniconda_users:
     - root

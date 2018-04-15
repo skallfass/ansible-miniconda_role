@@ -1,25 +1,68 @@
-- include_role:
-    name: uchida.miniconda
+---
 
-- name: Ensure miniconda_group exists
-  group:
-      name: '{{ miniconda_group }}'
-      state: present
-
-- name: add user to miniconda_group
-  user:
-      name: '{{ item }}'
-      groups:
-          - '{{ miniconda_group }}'
-      append: yes
-  loop: '{{ miniconda_users }}'
-
-- name: modify conda-folder permissions
+- name: Check if miniconda is installed
+  stat:
+    path: "{{ miniconda_prefix }}/bin/conda"
+  register: miniconda_executable
+# -----------------------------------------------------------------------------
+- name: Ensure directory {{ miniconda_prefix | dirname }} exists
   file:
-      path: '{{ miniconda_prefix }}'
-      owner: root
-      group: '{{ miniconda_group }}'
-      mode: 0775
-      state: directory
-      recurse: yes
-
+    path: "{{ miniconda_prefix | dirname }}"
+    state: directory
+    follow: yes
+  when: miniconda_executable.stat.exists == False
+# -----------------------------------------------------------------------------
+- name: Download miniconda installer
+  get_url:
+    url: "https://repo.continuum.io/miniconda/{{ miniconda_installer }}"
+    dest: "/tmp/{{ miniconda_installer }}"
+    checksum: "{{ miniconda_installer_checksum }}"
+    force: "{{ 'yes' if miniconda_installer_checksum == '' else 'no' }}"
+    mode: 0755
+  when: miniconda_executable.stat.exists == False
+# -----------------------------------------------------------------------------
+- name: Ensure package {{ item }} is installed
+  package:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - tar
+    - bzip2
+# -----------------------------------------------------------------------------
+- name: Install Miniconda
+  command: '/bin/bash "/tmp/{{ miniconda_installer}}" -b -p "{{ miniconda_prefix }}"'
+  become: True
+  args:
+    creates: "{{ miniconda_prefix }}"
+  when: miniconda_executable.stat.exists == False
+# -----------------------------------------------------------------------------
+- name: Check Miniconda for conda-updates
+  command: '"{{ miniconda_prefix }}/bin/conda" update conda -y -q'
+  register: miniconda_update
+  when: miniconda_update_conda
+  changed_when: '"All requested packages already installed" in miniconda_update'
+# -----------------------------------------------------------------------------
+- name: Ensure miniconda_group exists
+  become: True
+  group:
+    name: '{{ miniconda_group }}'
+    state: present
+# -----------------------------------------------------------------------------
+- name: Add user {{ item }} to miniconda_group
+  become: True
+  user:
+    name: '{{ item }}'
+    groups:
+        - '{{ miniconda_group }}'
+    append: yes
+  loop: '{{ miniconda_users }}'
+# -----------------------------------------------------------------------------
+- name: Modify conda-folder permissions
+  become: True
+  file:
+    path: '{{ miniconda_prefix }}'
+    owner: root
+    group: '{{ miniconda_group }}'
+    mode: 0775
+    state: directory
+    recurse: yes
